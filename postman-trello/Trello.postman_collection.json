@@ -1,0 +1,710 @@
+{
+  "info": {
+    "name": "Trello API tests (sample)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "End-to-end API test suite for Trello REST API: creates its own temporary board, runs a full card lifecycle (create, read, update, comment, delete) and removes the board at the end. Includes negative authorization and validation checks."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://api.trello.com/1"
+    },
+    {
+      "key": "boardId",
+      "value": ""
+    },
+    {
+      "key": "listId",
+      "value": ""
+    },
+    {
+      "key": "cardId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Card lifecycle",
+      "item": [
+        {
+          "name": "1. Get current member",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Response time < 3000 ms\", () => pm.expect(pm.response.responseTime).to.be.below(3000));",
+                  "const m = pm.response.json();",
+                  "pm.test(\"Member has id and username\", () => { pm.expect(m.id).to.be.a(\"string\").and.not.empty; pm.expect(m.username).to.be.a(\"string\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{apiKey}}\", oauth_token=\"{{apiToken}}\""
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/members/me?fields=username,fullName",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members",
+                "me"
+              ],
+              "query": [
+                {
+                  "key": "fields",
+                  "value": "username,fullName"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "2. Create a test board",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test(\"Board is created with the requested name\", () => pm.expect(b.name).to.eql(\"QA API test board\"));",
+                  "pm.test(\"Board id is returned\", () => pm.expect(b.id).to.be.a(\"string\").and.not.empty);",
+                  "pm.collectionVariables.set(\"boardId\", b.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{apiKey}}\", oauth_token=\"{{apiToken}}\""
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boards?name=QA API test board&defaultLists=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boards"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "QA API test board"
+                },
+                {
+                  "key": "defaultLists",
+                  "value": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "3. Get the board",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test(\"Board is open\", () => pm.expect(b.closed).to.eql(false));",
+                  "pm.test(\"Board id matches\", () => pm.expect(b.id).to.eql(pm.collectionVariables.get(\"boardId\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{apiKey}}\", oauth_token=\"{{apiToken}}\""
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boards/{{boardId}}?fields=name,closed",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boards",
+                "{{boardId}}"
+              ],
+              "query": [
+                {
+                  "key": "fields",
+                  "value": "name,closed"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "4. Get board lists",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "const l = pm.response.json();",
+                  "pm.test(\"Board has default lists\", () => pm.expect(l).to.be.an(\"array\").and.not.empty);",
+                  "pm.test(\"Every list has id and name\", () => l.forEach(x => { pm.expect(x.id).to.be.a(\"string\"); pm.expect(x.name).to.be.a(\"string\"); }));",
+                  "pm.collectionVariables.set(\"listId\", l[0].id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{apiKey}}\", oauth_token=\"{{apiToken}}\""
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boards/{{boardId}}/lists",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boards",
+                "{{boardId}}",
+                "lists"
+              ]
+            }
+          }
+        },
+        {
+          "name": "5. Create a card",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "pm.test(\"Card has the requested name and description\", () => { pm.expect(c.name).to.eql(\"Sample card\"); pm.expect(c.desc).to.eql(\"Created by API test\"); });",
+                  "pm.test(\"Card is in the chosen list\", () => pm.expect(c.idList).to.eql(pm.collectionVariables.get(\"listId\")));",
+                  "pm.collectionVariables.set(\"cardId\", c.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{apiKey}}\", oauth_token=\"{{apiToken}}\""
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cards?idList={{listId}}&name=Sample card&desc=Created by API test",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cards"
+              ],
+              "query": [
+                {
+                  "key": "idList",
+                  "value": "{{listId}}"
+                },
+                {
+                  "key": "name",
+                  "value": "Sample card"
+                },
+                {
+                  "key": "desc",
+                  "value": "Created by API test"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "6. Get the card",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Card id matches\", () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"cardId\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{apiKey}}\", oauth_token=\"{{apiToken}}\""
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cards/{{cardId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cards",
+                "{{cardId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "7. Update the card",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "pm.test(\"Name and description are updated\", () => { pm.expect(c.name).to.eql(\"Sample card (updated)\"); pm.expect(c.desc).to.eql(\"Updated description\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{apiKey}}\", oauth_token=\"{{apiToken}}\""
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cards/{{cardId}}?name=Sample card (updated)&desc=Updated description",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cards",
+                "{{cardId}}"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "Sample card (updated)"
+                },
+                {
+                  "key": "desc",
+                  "value": "Updated description"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "8. Add a comment to the card",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Comment text is saved\", () => pm.expect(pm.response.json().data.text).to.eql(\"Test comment\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{apiKey}}\", oauth_token=\"{{apiToken}}\""
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cards/{{cardId}}/actions/comments?text=Test comment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cards",
+                "{{cardId}}",
+                "actions",
+                "comments"
+              ],
+              "query": [
+                {
+                  "key": "text",
+                  "value": "Test comment"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "9. Get card actions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "const a = pm.response.json();",
+                  "pm.test(\"Actions include the comment\", () => pm.expect(a.some(x => x.type === \"commentCard\")).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{apiKey}}\", oauth_token=\"{{apiToken}}\""
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cards/{{cardId}}/actions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cards",
+                "{{cardId}}",
+                "actions"
+              ]
+            }
+          }
+        },
+        {
+          "name": "10. Delete the card",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{apiKey}}\", oauth_token=\"{{apiToken}}\""
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cards/{{cardId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cards",
+                "{{cardId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "11. Deleted card is not found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{apiKey}}\", oauth_token=\"{{apiToken}}\""
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cards/{{cardId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cards",
+                "{{cardId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "12. Delete the test board",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{apiKey}}\", oauth_token=\"{{apiToken}}\""
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boards/{{boardId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boards",
+                "{{boardId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "13. Deleted board is not found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{apiKey}}\", oauth_token=\"{{apiToken}}\""
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boards/{{boardId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boards",
+                "{{boardId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Negative checks",
+      "item": [
+        {
+          "name": "Request without credentials is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Error message is returned\", () => pm.expect(pm.response.text()).to.not.be.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/members/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Request with invalid token is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{apiKey}}\", oauth_token=\"invalid-token-for-test\""
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/members/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Board with malformed id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{apiKey}}\", oauth_token=\"{{apiToken}}\""
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boards/not-a-valid-id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boards",
+                "not-a-valid-id"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Board with well-formed but unknown id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{apiKey}}\", oauth_token=\"{{apiToken}}\""
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boards/000000000000000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boards",
+                "000000000000000000000000"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create card without a list",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "OAuth oauth_consumer_key=\"{{apiKey}}\", oauth_token=\"{{apiToken}}\""
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cards?name=No list",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cards"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "No list"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
